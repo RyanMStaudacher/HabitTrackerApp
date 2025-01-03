@@ -1,5 +1,4 @@
-﻿using System.Data.Common;
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.Data.Sqlite;
 
 namespace HabitTracker
@@ -11,35 +10,34 @@ namespace HabitTracker
         static void Main(string[] args)
         {
             Console.Clear();
-            using(var connection = new SqliteConnection(connectionString))
+
+            using(SqliteConnection connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
-                var tableCmd = connection.CreateCommand();
 
-                tableCmd.CommandText = @"CREATE TABLE IF NOT EXISTS drinking_water (Id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                SqliteCommand tableCmd = connection.CreateCommand();
+                tableCmd.CommandText = @"CREATE TABLE IF NOT EXISTS habits_table (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, 
                 Date TEXT, Quantity INTEGER)";
-
                 tableCmd.ExecuteNonQuery();
 
                 connection.Close();
             }
 
-            GetUserInput();
+            MainMenu();
         }
 
-        static void GetUserInput()
+        static void MainMenu()
         {
-            //Console.Clear();
             bool closeApp = false;
             while (closeApp == false)
             {
                 Console.WriteLine("MAIN MENU");
                 Console.WriteLine("\nWhat would you like to do?");
                 Console.WriteLine("\nType 0 to close the application.");
-                Console.WriteLine("Type 1 to view all records.");
-                Console.WriteLine("Type 2 to insert record.");
-                Console.WriteLine("Type 3 to delete record.");
-                Console.WriteLine("Type 4 to update record.");
+                Console.WriteLine("Type 1 to view all habit records.");
+                Console.WriteLine("Type 2 to insert habit record.");
+                Console.WriteLine("Type 3 to delete habit record.");
+                Console.WriteLine("Type 4 to update habit record.");
                 Console.WriteLine("------------------------------------");
 
                 string commandInput = Console.ReadLine();
@@ -48,7 +46,7 @@ namespace HabitTracker
                 {
                     case "0":
                         Console.Clear();
-                        Console.WriteLine("\nGoodbye!");
+                        Console.WriteLine("Goodbye!");
                         System.Threading.Thread.Sleep(1500);
                         Console.Clear();
                         closeApp = true;
@@ -67,7 +65,10 @@ namespace HabitTracker
                         Update();
                     break;
                     default:
-                        Console.WriteLine("\nInvalid command. Please type a number from 0 to 4.\n");
+                        Console.Clear();
+                        Console.WriteLine("Invalid command. Please type a number from 0 to 4.\nPress enter to continue...");
+                        Console.ReadLine();
+                        Console.Clear();
                     break;
                 }
             }
@@ -75,40 +76,42 @@ namespace HabitTracker
 
         private static void GetAllRecords()
         {
-            //Console.Clear();
-            using (var connection = new SqliteConnection(connectionString))
+            Console.Clear();
+
+            using (SqliteConnection connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
-                var tableCmd = connection.CreateCommand();
-                tableCmd.CommandText = $"SELECT * FROM drinking_water ";
 
-                List<DrinkingWater> tableData = new List<DrinkingWater>();
+                SqliteCommand getRecordsCmd = connection.CreateCommand();
+                getRecordsCmd.CommandText = $"SELECT * FROM habits_table ";
+                SqliteDataReader reader = getRecordsCmd.ExecuteReader();
 
-                SqliteDataReader reader = tableCmd.ExecuteReader();
+                List<Habit> tableData = new List<Habit>();
 
                 if(reader.HasRows)
                 {
                     while(reader.Read())
                     {
-                        tableData.Add(new DrinkingWater
+                        tableData.Add(new Habit
                         {
                             Id = reader.GetInt32(0),
-                            Date = DateTime.ParseExact(reader.GetString(1), "dd-MM-yy", new CultureInfo("en-US")),
-                            Quantity = reader.GetInt32(2)
+                            Name = reader.GetString(1),
+                            Date = DateTime.ParseExact(reader.GetString(2), "dd-MM-yy", new CultureInfo("en-US")),
+                            Quantity = reader.GetInt32(3)
                         });
                     }
                 }
                 else
                 {
-                    Console.WriteLine("No rows found");
+                    Console.WriteLine("No entries found");
                 }
 
                 connection.Close();
 
                 Console.WriteLine("--------------------------------------------");
-                foreach (DrinkingWater dw in tableData)
+                foreach (Habit dw in tableData)
                 {
-                    Console.WriteLine($"{dw.Id} - {dw.Date.ToString("dd-MMM-yyyy")} - Quantity: {dw.Quantity}");
+                    Console.WriteLine($"{dw.Id} - {dw.Name.ToString()} - {dw.Date.ToString("dd-MMM-yyyy")} - Quantity: {dw.Quantity}");
                 }
                 Console.WriteLine("--------------------------------------------\n");
 
@@ -121,16 +124,17 @@ namespace HabitTracker
         private static void Insert()
         {
             Console.Clear();
-            string date = GetDateInput();
 
-            int quantity = GetNumberInput("Please insert number of glasses or other measure of your choice (no decimals allowed)");
+            string name = GetNameInput("Please enter the name of the Habit to be logged. Type 0 to return to the main menu.");
+            string date = GetDateInput("Please enter the date the habit was performed: (Format: dd-mm-yy). Type 0 to return to main menu.");
+            int quantity = GetNumberInput("Please enter the number of times the habit was performed. Type 0 to go back to the main menu.");
 
-            using (var connection = new SqliteConnection(connectionString))
+            using (SqliteConnection connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
-                var tableCmd = connection.CreateCommand();
-                tableCmd.CommandText = $"INSERT INTO drinking_water(date, quantity) VALUES('{date}', {quantity})";
 
+                SqliteCommand tableCmd = connection.CreateCommand();
+                tableCmd.CommandText = $"INSERT INTO habits_table(name, date, quantity) VALUES('{name}', '{date}', {quantity})";
                 tableCmd.ExecuteNonQuery();
 
                 connection.Close();
@@ -144,36 +148,37 @@ namespace HabitTracker
             Console.Clear();
             GetAllRecords();
 
-            var recordId = GetNumberInput("\nPlease type the Id of the record you want to delete or type 0 to go back to the main menu.");
+            int recordId = GetNumberInput("Please type the Id of the record you want to delete or type 0 to go back to the main menu.");
 
-            using(var connection = new SqliteConnection(connectionString))
+            using(SqliteConnection connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
-                var tableCmd = connection.CreateCommand();
-                //tableCmd.CommandText = $"DELETE from drinking_water WHERE Id = '{recordId}'";
 
-                tableCmd.CommandText = $"Select COUNT(1) from drinking_water Where Id = '{recordId}'";
+                SqliteCommand checkDeleteCmd = connection.CreateCommand();
+                checkDeleteCmd.CommandText = $"Select COUNT(1) from habits_table Where Id = '{recordId}'";
+                int checkDeleteCmdOutput = Convert.ToInt32(checkDeleteCmd.ExecuteScalar());
 
-                var commandOutput = tableCmd.ExecuteScalar().ToString();
-
-                if(commandOutput == "1")
+                if(checkDeleteCmdOutput == 1)
                 {
-                    tableCmd.CommandText = $"DELETE from drinking_water WHERE Id = '{recordId}'";
-                    tableCmd.ExecuteNonQuery();
+                    checkDeleteCmd.CommandText = $"DELETE from habits_table WHERE Id = '{recordId}'";
+                    checkDeleteCmd.ExecuteNonQuery();
                 }
-                else if(commandOutput == "0")
+                else if(checkDeleteCmdOutput == 0)
                 {
+                    connection.Close();
                     Console.WriteLine($"Record with Id {recordId} doesn't exist.\nPress enter to continue...");
                     Console.ReadLine();
                     Delete();
                 }
+
+                connection.Close();
             }
 
             Console.WriteLine($"Record with Id {recordId} was deleted.\nPress enter to continue...");
             Console.ReadLine();
             Console.Clear();
 
-            GetUserInput();
+            MainMenu();
         }
 
         private static void Update()
@@ -181,50 +186,77 @@ namespace HabitTracker
             Console.Clear();
             GetAllRecords();
 
-            var recordId = GetNumberInput("\n\nPlease type the Id of the record you would like to update. Type 0 to return to the main menu.");
+            int recordId = GetNumberInput("Please type the Id of the record you would like to update. Type 0 to return to the main menu.");
 
-            using( var connection = new SqliteConnection(connectionString))
+            using(SqliteConnection connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
 
-                var checkCmd = connection.CreateCommand();
-                checkCmd.CommandText = $"SELECT EXISTS(SELECT 1 FROM drinking_water WHERE Id = {recordId})";
-                int checkQuery = Convert.ToInt32(checkCmd.ExecuteScalar());
+                SqliteCommand checkUpdateCmd = connection.CreateCommand();
+                checkUpdateCmd.CommandText = $"Select COUNT(1) from habits_table Where Id = '{recordId}'";
+                int checkUpdateCmdOutput = Convert.ToInt32(checkUpdateCmd.ExecuteScalar());
 
-                if(checkQuery == 0)
+                if(checkUpdateCmdOutput == 1)
                 {
-                    Console.WriteLine($"\n\nRecord with Id {recordId} doesn't exist.\n\n");
-                    connection.Close();
+                    string name = GetNameInput("Please enter the name of the Habit to be logged. Type 0 to return to the main menu.");
+                    string date = GetDateInput("Please enter the date the habit was performed: (Format: dd-mm-yy). Type 0 to return to main menu.");
+                    int quantity = GetNumberInput("Please enter the number of times the habit was performed.");
+
+                    SqliteCommand updateCmd = connection.CreateCommand();
+                    updateCmd.CommandText = $"UPDATE habits_table SET name = '{name}', date = '{date}', quantity = {quantity} WHERE Id = {recordId}";
+                    updateCmd.ExecuteNonQuery();
+
+                    Console.WriteLine($"Record with Id {recordId} has been updated.\nPress enter to continue...");
+                    Console.ReadLine();
+                }
+                else if(checkUpdateCmdOutput == 0)
+                {
+                    Console.WriteLine($"Record with Id {recordId} doesn't exist.\nPress enter to continue...");
+                    Console.ReadLine();
                     Update();
                 }
 
-                string date = GetDateInput();
-
-                int quantity = GetNumberInput("\nPlease insert number of glasses or other measure of your choice. (no decimals allowed)");
-
-                var tableCmd = connection.CreateCommand();
-                tableCmd.CommandText = $"UPDATE drinking_water SET date = '{date}', quantity = {quantity} WHERE Id = {recordId}";
-
-                tableCmd.ExecuteNonQuery();
-
                 connection.Close();
             }
+
+            Console.Clear();
         }
 
-        internal static string GetDateInput()
+        internal static string GetNameInput(string message)
         {
-            Console.WriteLine("\nPlease insert the date: (Format: dd-mm-yy). Type 0 to return to main menu.");
+            Console.WriteLine(message);
+            string nameInput = Console.ReadLine();
 
+            if(nameInput == "0")
+            {
+                Console.Clear();
+                MainMenu();
+            }
+
+            if(nameInput == "")
+            {
+                nameInput = "Habit";
+            }
+
+            Console.WriteLine();
+
+            return nameInput;
+        }
+
+        internal static string GetDateInput(string message)
+        {
+            Console.WriteLine(message);
             string dateInput = Console.ReadLine();
 
             if(dateInput == "0")
             {
-                GetUserInput();
+                Console.Clear();
+                MainMenu();
             }
 
             while(!DateTime.TryParseExact(dateInput, "dd-MM-yy", new CultureInfo("en-US"), DateTimeStyles.None, out _))
             {
-                Console.WriteLine("\n\nInvalid date. (Format: dd-MM-yy). Type 0 to return to main menu or try again.\n\n");
+                Console.WriteLine("\nInvalid date format (Correct format -> dd-MM-yy). Please enter a date following the correct date format.");
                 dateInput = Console.ReadLine();
             }
 
@@ -236,18 +268,17 @@ namespace HabitTracker
         internal static int GetNumberInput(string message)
         {
             Console.WriteLine(message);
-
             string numberInput = Console.ReadLine();
 
             if(numberInput == "0")
             {
                 Console.Clear();
-                GetUserInput();
+                MainMenu();
             }
 
             while(!Int32.TryParse(numberInput, out _) || Convert.ToInt32(numberInput) < 0)
             {
-                Console.WriteLine("\n\nInvalid number. Try again.\n\n");
+                Console.WriteLine("\nInvalid number. Try again.");
                 numberInput = Console.ReadLine();
             }
 
@@ -259,8 +290,9 @@ namespace HabitTracker
         }
     }
 
-    public class DrinkingWater
+    public class Habit
     {
+        public string Name { get; set; }
         public int Id { get; set; }
         public DateTime Date { get; set; }
         public int Quantity { get; set; }
